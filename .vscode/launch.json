@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run ObjectIO Server",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/run-dev.js",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "cargo build"
+        }
+    ]
+}

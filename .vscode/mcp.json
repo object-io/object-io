@@ -1,0 +1,13 @@
+{
+	"servers": {
+		"youtrack": {
+            "command": "node",
+            "args": ["/Users/itsalfredakku/McpServers/youtrack-mcp-ts/dist/index.js"],
+            "env": {
+                "YOUTRACK_URL": "https://youtrack.devstroop.com",
+                "YOUTRACK_TOKEN": "perm-YWthc2g=.NDItMw==.U4iApwvLfqVakyVS76gyB9MDWuQ96W",
+                "PROJECT_ID": "OIO"
+            }
+        }
+	}
+}

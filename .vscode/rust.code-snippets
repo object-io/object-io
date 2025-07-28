@@ -1,0 +1,167 @@
+{
+    "S3 API Handler": {
+        "prefix": "s3handler",
+        "body": [
+            "#[tracing::instrument(skip(state))]",
+            "pub async fn ${1:handler_name}(",
+            "    Path(${2:(bucket, key)}: Path<(String, String)>,",
+            "    State(state): State<AppState>,",
+            ") -> Result<impl IntoResponse, ApiError> {",
+            "    tracing::info!(\"${3:Handler description}\");",
+            "    ",
+            "    // Validate input",
+            "    validate_bucket_name(&${4:bucket})?;",
+            "    validate_object_key(&${5:key})?;",
+            "    ",
+            "    // TODO: Implement ${6:functionality}",
+            "    ",
+            "    Ok(StatusCode::OK)",
+            "}"
+        ],
+        "description": "Create a new S3 API handler function"
+    },
+    "Error Type Definition": {
+        "prefix": "errortype",
+        "body": [
+            "#[derive(Debug, thiserror::Error)]",
+            "pub enum ${1:ErrorName} {",
+            "    #[error(\"${2:Error message}: {${3:field}}\")]",
+            "    ${4:ErrorVariant} { ${3:field}: String },",
+            "    ",
+            "    #[error(\"Database error: {0}\")]",
+            "    Database(#[from] surrealdb::Error),",
+            "    ",
+            "    #[error(\"IO error: {0}\")]",
+            "    Io(#[from] std::io::Error),",
+            "}"
+        ],
+        "description": "Create a new error type with thiserror"
+    },
+    "Database Operation": {
+        "prefix": "dbop",
+        "body": [
+            "#[tracing::instrument(skip(db))]",
+            "pub async fn ${1:operation_name}(",
+            "    db: &Database,",
+            "    ${2:params}: &${3:ParamType},",
+            ") -> Result<${4:ReturnType}, StorageError> {",
+            "    let query = \"${5:SELECT * FROM table WHERE id = $id}\";",
+            "    ",
+            "    let mut result = db",
+            "        .query(query)",
+            "        .bind((\"${6:param}\", ${2:params}))$0",
+            "        .await?;",
+            "    ",
+            "    let ${7:data}: Option<${4:ReturnType}> = result.take(0)?;",
+            "    ",
+            "    ${7:data}.ok_or(StorageError::NotFound)",
+            "}"
+        ],
+        "description": "Create a database operation function"
+    },
+    "Leptos Component": {
+        "prefix": "leptoscomp",
+        "body": [
+            "#[component]",
+            "pub fn ${1:ComponentName}(${2:props}: ${3:PropsType}) -> impl IntoView {",
+            "    let (${4:signal}, ${5:set_signal}) = create_signal(${6:initial_value});",
+            "    ",
+            "    view! {",
+            "        <div class=\"${7:css-class}\">",
+            "            ${8:// Component content}",
+            "        </div>",
+            "    }",
+            "}"
+        ],
+        "description": "Create a new Leptos component"
+    },
+    "Test Function": {
+        "prefix": "test",
+        "body": [
+            "#[tokio::test]",
+            "async fn test_${1:function_name}() -> Result<(), Box<dyn std::error::Error>> {",
+            "    // Given",
+            "    ${2:// Setup test data}",
+            "    ",
+            "    // When",
+            "    let result = ${3:function_call}().await;",
+            "    ",
+            "    // Then",
+            "    assert!(result.is_ok());",
+            "    ${4:// Additional assertions}",
+            "    ",
+            "    Ok(())",
+            "}"
+        ],
+        "description": "Create an async test function"
+    },
+    "Configuration Struct": {
+        "prefix": "config",
+        "body": [
+            "#[derive(Debug, Clone, Serialize, Deserialize)]",
+            "pub struct ${1:ConfigName} {",
+            "    #[serde(default = \"${2:default_function}\")]",
+            "    pub ${3:field_name}: ${4:FieldType},",
+            "    ",
+            "    #[serde(default)]",
+            "    pub ${5:optional_field}: Option<${6:OptionalType}>,",
+            "}",
+            "",
+            "impl Default for ${1:ConfigName} {",
+            "    fn default() -> Self {",
+            "        Self {",
+            "            ${3:field_name}: ${2:default_function}(),",
+            "            ${5:optional_field}: None,",
+            "        }",
+            "    }",
+            "}",
+            "",
+            "fn ${2:default_function}() -> ${4:FieldType} {",
+            "    ${7:default_value}",
+            "}"
+        ],
+        "description": "Create a configuration struct with serde support"
+    },
+    "API Response": {
+        "prefix": "apiresponse",
+        "body": [
+            "#[derive(Debug, Serialize, Deserialize)]",
+            "pub struct ${1:ResponseName} {",
+            "    pub ${2:field}: ${3:Type},",
+            "    ",
+            "    #[serde(skip_serializing_if = \"Option::is_none\")]",
+            "    pub ${4:optional_field}: Option<${5:OptionalType}>,",
+            "}",
+            "",
+            "impl IntoResponse for ${1:ResponseName} {",
+            "    fn into_response(self) -> Response {",
+            "        Json(self).into_response()",
+            "    }",
+            "}"
+        ],
+        "description": "Create an API response struct"
+    },
+    "Validation Function": {
+        "prefix": "validate",
+        "body": [
+            "pub fn validate_${1:field_name}(${2:input}: &str) -> Result<(), ValidationError> {",
+            "    if ${2:input}.is_empty() {",
+            "        return Err(ValidationError::Empty(\"${3:Field name}\".to_string()));",
+            "    }",
+            "    ",
+            "    if ${2:input}.len() > ${4:MAX_LENGTH} {",
+            "        return Err(ValidationError::TooLong {",
+            "            field: \"${3:Field name}\".to_string(),",
+            "            max_length: ${4:MAX_LENGTH},",
+            "        });",
+            "    }",
+            "    ",
+            "    // Additional validation logic",
+            "    ${5:// Custom validation}",
+            "    ",
+            "    Ok(())",
+            "}"
+        ],
+        "description": "Create a validation function"
+    }
+}

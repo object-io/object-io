@@ -1,0 +1,26 @@
+{
+    "recommendations": [
+        "rust-lang.rust-analyzer",
+        "github.copilot",
+        "github.copilot-chat",
+        "tamasfe.even-better-toml",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-json",
+        "vadimcn.vscode-lldb",
+        "serayuzgur.crates",
+        "fill-labs.dependi",
+        "bierner.markdown-mermaid",
+        "yzhang.markdown-all-in-one",
+        "redhat.vscode-yaml",
+        "ms-vscode.test-adapter-converter",
+        "hbenl.vscode-test-explorer",
+        "formulahendry.auto-rename-tag",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode-remote.remote-containers",
+        "ms-azuretools.vscode-docker"
+    ],
+    "unwantedRecommendations": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+    ]
+}

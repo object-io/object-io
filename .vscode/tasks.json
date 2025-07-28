@@ -1,0 +1,173 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "cargo build",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["build"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "cargo build release",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["build", "--release"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "cargo test",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["test"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "cargo test build",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["test", "--no-run"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "cargo clippy",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "cargo fmt",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["fmt"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "cargo run server",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["run", "--bin", "object-io-server"],
+            "group": "build",
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "env": {
+                    "RUST_LOG": "debug",
+                    "DATABASE_URL": "surreal://localhost:8000/objectio",
+                    "REDIS_URL": "redis://localhost:6379"
+                }
+            }
+        },
+        {
+            "label": "trunk serve frontend",
+            "type": "shell",
+            "command": "trunk",
+            "args": ["serve", "--open"],
+            "group": "build",
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/frontend"
+            }
+        },
+        {
+            "label": "start dev environment",
+            "dependsOrder": "parallel",
+            "dependsOn": [
+                "cargo run server",
+                "trunk serve frontend"
+            ],
+            "group": "build",
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "setup database",
+            "type": "shell",
+            "command": "surreal",
+            "args": ["start", "--log", "trace", "--user", "root", "--pass", "root", "file://objectio.db"],
+            "group": "build",
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "full quality check",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "cargo fmt",
+                "cargo clippy",
+                "cargo test"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        }
+    ]
+}
