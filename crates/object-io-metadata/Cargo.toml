@@ -1,0 +1,25 @@
+[package]
+name = "object-io-metadata"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Metadata management and database integration for ObjectIO"
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+object-io-core = { path = "../object-io-core" }
+
+surrealdb.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio-test.workspace = true

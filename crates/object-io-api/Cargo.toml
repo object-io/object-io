@@ -1,0 +1,36 @@
+[package]
+name = "object-io-api"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "S3-compatible REST API for ObjectIO"
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+object-io-core = { path = "../object-io-core" }
+object-io-storage = { path = "../object-io-storage" }
+object-io-metadata = { path = "../object-io-metadata" }
+
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+quick-xml.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+hex.workspace = true
+chrono.workspace = true
+bytes.workspace = true
+tokio-util.workspace = true
+futures.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio-test.workspace = true
+tempfile.workspace = true

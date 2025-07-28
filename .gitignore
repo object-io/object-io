@@ -1,0 +1,33 @@
+# Ignore build artifacts
+/target/
+**/target/
+
+# IDE files
+.vscode/
+.idea/
+
+# Environment files
+.env
+.env.local
+
+# Database files
+*.db
+
+# Log files
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Frontend build artifacts
+/frontend/dist/
+node_modules/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Coverage reports
+/coverage/
+tarpaulin-report.html

@@ -1,0 +1,107 @@
+use leptos::prelude::*;
+use crate::api;
+use crate::types::ObjectInfo;
+
+#[component]
+pub fn BucketDetailPage() -> impl IntoView {
+    let bucket_name = "example-bucket".to_string(); // Temporary fixed value
+    
+    let objects = leptos::prelude::Resource::new(
+        || bucket_name.clone(),
+        |name| api::list_objects(&name)
+    );
+
+    view! {
+        <div class="buckets-container">
+            <div class="buckets-header">
+                <h2 class="section-title">
+                    "Bucket: " {&bucket_name}
+                </h2>
+                <div style="display: flex; gap: 1rem;">
+                    <button class="btn">
+                        "⬆️ Upload Object"
+                    </button>
+                    <a href="/buckets" class="btn btn-secondary">
+                        "← Back to Buckets"
+                    </a>
+                </div>
+            </div>
+            
+            <Suspense fallback=move || view! { <div class="loading"><div class="spinner"></div>"Loading objects..."</div> }>
+                {move || {
+                    objects.get().map(|result| {
+                        match result {
+                            Ok(objects) => {
+                                if objects.is_empty() {
+                                    view! {
+                                        <div style="text-align: center; padding: 2rem;">
+                                            <p style="color: #6b7280; margin-bottom: 1rem;">
+                                                "This bucket is empty. Upload your first object to get started."
+                                            </p>
+                                            <button class="btn">
+                                                "Upload First Object"
+                                            </button>
+                                        </div>
+                                    }.into_view()
+                                } else {
+                                    view! {
+                                        <ObjectList objects=objects/>
+                                    }.into_view()
+                                }
+                            },
+                            Err(err) => view! {
+                                <div class="error">
+                                    "Failed to load objects: " {err}
+                                </div>
+                            }.into_view(),
+                        }
+                    })
+                }}
+            </Suspense>
+        </div>
+    }
+}
+
+#[component]
+fn ObjectList(objects: Vec<ObjectInfo>) -> impl IntoView {
+    let format_size = |bytes: u64| {
+        if bytes < 1024 {
+            format!("{} B", bytes)
+        } else if bytes < 1024 * 1024 {
+            format!("{:.1} KB", bytes as f64 / 1024.0)
+        } else if bytes < 1024 * 1024 * 1024 {
+            format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+        } else {
+            format!("{:.1} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+        }
+    };
+
+    view! {
+        <div class="bucket-list">
+            {objects.into_iter().map(|object| {
+                view! {
+                    <div class="bucket-item">
+                        <div class="bucket-info">
+                            <div class="bucket-name">{object.key.clone()}</div>
+                            <div class="bucket-meta">
+                                {format!("{} • {} • Modified {}", 
+                                    format_size(object.size),
+                                    object.content_type,
+                                    object.last_modified.format("%Y-%m-%d %H:%M")
+                                )}
+                            </div>
+                        </div>
+                        <div class="bucket-actions">
+                            <button class="btn btn-small">
+                                "Download"
+                            </button>
+                            <button class="btn btn-small btn-secondary">
+                                "Delete"
+                            </button>
+                        </div>
+                    </div>
+                }
+            }).collect::<Vec<_>>()}
+        </div>
+    }
+}

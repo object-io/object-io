@@ -107,7 +107,7 @@
             }
         },
         {
-            "label": "trunk serve frontend",
+            "label": "trunk serve console",
             "type": "shell",
             "command": "trunk",
             "args": ["serve", "--open"],
@@ -120,7 +120,7 @@
                 "panel": "shared"
             },
             "options": {
-                "cwd": "${workspaceFolder}/frontend"
+                "cwd": "${workspaceFolder}/console"
             }
         },
         {
@@ -128,7 +128,7 @@
             "dependsOrder": "parallel",
             "dependsOn": [
                 "cargo run server",
-                "trunk serve frontend"
+                "trunk serve console"
             ],
             "group": "build",
             "isBackground": true,

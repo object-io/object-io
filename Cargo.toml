@@ -1,0 +1,50 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/object-io-core",
+    "crates/object-io-storage",
+    "crates/object-io-api",
+    "crates/object-io-metadata",
+    "crates/object-io-server",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Akash Shah <akash@devstroop.com>"]
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/devstroop/object-io"
+repository = "https://github.com/devstroop/object-io"
+description = "ObjectIO - S3-compatible self-hosted object storage system"
+readme = "README.md"
+keywords = ["s3", "storage", "object-storage", "aws", "compatible"]
+categories = ["web-programming", "database", "filesystem"]
+
+[workspace.dependencies]
+tokio = { version = "1.35", features = ["full"] }
+axum = { version = "0.7", features = ["macros", "multipart"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.5", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+quick-xml = { version = "0.31", features = ["serialize"] }
+surrealdb = { version = "1.1", features = ["kv-rocksdb"] }
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+config = "0.14"
+dotenvy = "0.15"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-opentelemetry = "0.21"
+anyhow = "1.0"
+thiserror = "1.0"
+bytes = "1.5"
+futures = "0.3"
+tokio-util = "0.7"
+tempfile = "3.8"
+# Testing
+tokio-test = "0.4"
+async-trait = "0.1"
