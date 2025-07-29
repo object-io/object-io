@@ -7,7 +7,7 @@
 			],
 			"env": {
 				"YOUTRACK_URL": "https://youtrack.devstroop.com",
-				"YOUTRACK_TOKEN": "perm-YWthc2g=.NDItMw==.U4iApwvLfqVakyVS76gyB9MDWuQ96W",
+				"YOUTRACK_TOKEN": "<your-youtrack-token>",
 				"PROJECT_ID": "OIO"
 			},
 			"type": "stdio"
