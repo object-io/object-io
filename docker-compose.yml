@@ -1,0 +1,143 @@
+services:
+  #============================================================================
+  # ObjectIO Server - Main S3-compatible API
+  #============================================================================
+  objectio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: objectio-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Application Configuration
+      - RUST_LOG=info
+      - HOST=0.0.0.0
+      - PORT=8080
+      
+      # Database Configuration  
+      - DATABASE_URL=surreal://surrealdb:8000/objectio
+      - SURREAL_USER=root
+      - SURREAL_PASS=objectio_secure_2025
+      
+      # Redis Configuration
+      - REDIS_URL=redis://redis:6379
+      
+      # Storage Configuration
+      - STORAGE_PATH=/app/data
+      - MAX_OBJECT_SIZE=5GB
+      - ENABLE_VERSIONING=true
+      
+      # Security Configuration
+      - JWT_SECRET=your-super-secure-jwt-secret-change-in-production
+    volumes:
+      - objectio_data:/app/data
+      - objectio_logs:/app/logs
+    depends_on:
+      - surrealdb
+      - redis
+    networks:
+      - objectio-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  #============================================================================
+  # ObjectIO Console - Web Frontend
+  #============================================================================
+  console:
+    build:
+      context: .
+      dockerfile: console/Dockerfile
+    container_name: objectio-console
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - API_URL=http://objectio:8080
+    depends_on:
+      - objectio
+    networks:
+      - objectio-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  #============================================================================
+  # SurrealDB - Primary Database
+  #============================================================================
+  surrealdb:
+    image: surrealdb/surrealdb:v2.0.4
+    container_name: objectio-surrealdb
+    restart: unless-stopped
+    command: 
+      - start
+      - --log=info
+      - --user=root
+      - --pass=objectio_secure_2025
+      - file:///data/objectio.db
+    ports:
+      - "8000:8000"
+    environment:
+      - SURREAL_LOG=info
+    volumes:
+      - surrealdb_data:/data
+    networks:
+      - objectio-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  #============================================================================
+  # Redis - Caching Layer
+  #============================================================================
+  redis:
+    image: redis:7.4-alpine
+    container_name: objectio-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass objectio_redis_2025
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=objectio_redis_2025
+    volumes:
+      - redis_data:/data
+    networks:
+      - objectio-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  objectio-network:
+    driver: bridge
+
+#==============================================================================
+# Volume Configuration
+#==============================================================================
+volumes:
+  # Application Data
+  objectio_data:
+    driver: local
+  
+  objectio_logs:
+    driver: local
+  
+  # Database Data
+  surrealdb_data:
+    driver: local
+  
+  redis_data:
+    driver: local
+  

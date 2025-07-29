@@ -4,7 +4,7 @@
 
 # ObjectIO
 
-[![Build Status](https://github.com/devstroop/object-io/workflows/CI/badge.svg)](https://github.com/devstroop/object-io/actions)
+[![Build Status](https://github.com/object-io/object-io/workflows/CI/badge.svg)](https://github.com/object-io/object-io/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
@@ -77,7 +77,7 @@ graph TD
 1. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/devstroop/object-io.git
+   git clone https://github.com/object-io/object-io.git
    cd object-io
    ```
 
