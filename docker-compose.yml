@@ -52,7 +52,9 @@ services:
   # ObjectIO Console - Web Frontend (from separate repository)
   #============================================================================
   console:
-    image: ghcr.io/object-io/object-io-console:latest
+    build:
+      context: .
+      dockerfile: console/Dockerfile
     restart: unless-stopped
     ports:
       - "${CONSOLE_PORT:-80}:80"
