@@ -144,13 +144,6 @@ docker-compose -f docker-compose.dev.yml up -d
 docker-compose up -d objectio surrealdb redis
 ```
 
-#### Option 3: Backend Only (Production)
-
-```bash
-# Build and run only the backend services
-docker-compose up -d objectio surrealdb redis
-```
-
 #### Option 4: Custom Console Build
 
 If you want to build the console from source instead of using the pre-built image:
