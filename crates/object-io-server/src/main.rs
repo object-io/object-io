@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
     // Load configuration from environment
     dotenvy::dotenv().ok();
     
-    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let _host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "3000".to_string())
         .parse::<u16>()
