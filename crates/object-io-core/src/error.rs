@@ -29,6 +29,9 @@ pub enum ObjectIOError {
     #[error("Authorization failed: {reason}")]
     AuthorizationFailed { reason: String },
 
+    #[error("Authentication error: {message}")]
+    AuthError { message: String },
+
     #[error("Storage error: {message}")]
     StorageError { message: String },
 
@@ -65,6 +68,7 @@ impl ObjectIOError {
             ObjectIOError::InvalidObjectKey { .. } => 400,
             ObjectIOError::AuthenticationFailed { .. } => 401,
             ObjectIOError::AuthorizationFailed { .. } => 403,
+            ObjectIOError::AuthError { .. } => 403,
             ObjectIOError::InvalidRequest { .. } => 400,
             ObjectIOError::StorageError { .. } => 500,
             ObjectIOError::DatabaseError { .. } => 500,

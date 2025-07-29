@@ -1,4 +1,5 @@
 use leptos::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 use crate::api;
 use crate::types::ObjectInfo;
 
@@ -6,16 +7,33 @@ use crate::types::ObjectInfo;
 pub fn BucketDetailPage() -> impl IntoView {
     let bucket_name = "example-bucket".to_string(); // Temporary fixed value
     
-    let objects = leptos::prelude::Resource::new(
-        || bucket_name.clone(),
-        |name| api::list_objects(&name)
-    );
+    let (objects, set_objects) = signal(Vec::<ObjectInfo>::new());
+    let (loading, set_loading) = signal(true);
+    let (error, set_error) = signal(None::<String>);
+
+    // Load objects on mount
+    {
+        let bucket_name = bucket_name.clone();
+        spawn_local(async move {
+            set_loading.set(true);
+            match api::list_objects(&bucket_name).await {
+                Ok(object_list) => {
+                    set_objects.set(object_list);
+                    set_error.set(None);
+                }
+                Err(err) => {
+                    set_error.set(Some(err));
+                }
+            }
+            set_loading.set(false);
+        });
+    }
 
     view! {
         <div class="buckets-container">
             <div class="buckets-header">
                 <h2 class="section-title">
-                    "Bucket: " {&bucket_name}
+                    "Bucket: " {bucket_name.clone()}
                 </h2>
                 <div style="display: flex; gap: 1rem;">
                     <button class="btn">
@@ -27,37 +45,40 @@ pub fn BucketDetailPage() -> impl IntoView {
                 </div>
             </div>
             
-            <Suspense fallback=move || view! { <div class="loading"><div class="spinner"></div>"Loading objects..."</div> }>
-                {move || {
-                    objects.get().map(|result| {
-                        match result {
-                            Ok(objects) => {
-                                if objects.is_empty() {
-                                    view! {
-                                        <div style="text-align: center; padding: 2rem;">
-                                            <p style="color: #6b7280; margin-bottom: 1rem;">
-                                                "This bucket is empty. Upload your first object to get started."
-                                            </p>
-                                            <button class="btn">
-                                                "Upload First Object"
-                                            </button>
-                                        </div>
-                                    }.into_view()
-                                } else {
-                                    view! {
-                                        <ObjectList objects=objects/>
-                                    }.into_view()
-                                }
-                            },
-                            Err(err) => view! {
-                                <div class="error">
-                                    "Failed to load objects: " {err}
-                                </div>
-                            }.into_view(),
-                        }
-                    })
-                }}
-            </Suspense>
+            {move || {
+                if loading.get() {
+                    view! {
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            "Loading objects..."
+                        </div>
+                    }.into_any()
+                } else if let Some(err) = error.get() {
+                    view! {
+                        <div class="error">
+                            "Failed to load objects: " {err}
+                        </div>
+                    }.into_any()
+                } else {
+                    let object_list = objects.get();
+                    if object_list.is_empty() {
+                        view! {
+                            <div style="text-align: center; padding: 2rem;">
+                                <p style="color: #6b7280; margin-bottom: 1rem;">
+                                    "This bucket is empty. Upload your first object to get started."
+                                </p>
+                                <button class="btn">
+                                    "Upload First Object"
+                                </button>
+                            </div>
+                        }.into_any()
+                    } else {
+                        view! {
+                            <ObjectList objects=object_list/>
+                        }.into_any()
+                    }
+                }
+            }}
         </div>
     }
 }

@@ -1,29 +1,55 @@
 use leptos::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 use crate::api;
 use crate::types::SystemStats;
 
 #[component]
 pub fn HomePage() -> impl IntoView {
-    let stats = leptos::prelude::Resource::new(|| (), |_| api::get_system_stats());
+    let (stats, set_stats) = signal(None::<SystemStats>);
+    let (loading, set_loading) = signal(true);
+    let (error, set_error) = signal(None::<String>);
+
+    // Load stats on mount
+    spawn_local(async move {
+        set_loading.set(true);
+        match api::get_system_stats().await {
+            Ok(system_stats) => {
+                set_stats.set(Some(system_stats));
+                set_error.set(None);
+            }
+            Err(err) => {
+                set_error.set(Some(err));
+            }
+        }
+        set_loading.set(false);
+    });
 
     view! {
         <div class="dashboard-grid">
-            <Suspense fallback=move || view! { <div class="loading"><div class="spinner"></div>"Loading stats..."</div> }>
-                {move || {
-                    stats.get().map(|result| {
-                        match result {
-                            Ok(stats) => view! {
-                                <StatsCards stats=stats/>
-                            }.into_view(),
-                            Err(err) => view! {
-                                <div class="error">
-                                    "Failed to load stats: " {err}
-                                </div>
-                            }.into_view(),
-                        }
-                    })
-                }}
-            </Suspense>
+            {move || {
+                if loading.get() {
+                    view! {
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            "Loading stats..."
+                        </div>
+                    }.into_any()
+                } else if let Some(err) = error.get() {
+                    view! {
+                        <div class="error">
+                            "Failed to load stats: " {err}
+                        </div>
+                    }.into_any()
+                } else if let Some(system_stats) = stats.get() {
+                    view! {
+                        <StatsCards stats=system_stats/>
+                    }.into_any()
+                } else {
+                    view! {
+                        <div>"No data available"</div>
+                    }.into_any()
+                }
+            }}
         </div>
         
         <div class="dashboard-grid">

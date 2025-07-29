@@ -1,5 +1,6 @@
 //! Metadata models for database operations
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -40,6 +41,45 @@ pub struct UserRecord {
     pub created_at: String,
     pub is_admin: bool,
     pub permissions: Vec<String>,
+}
+
+/// Public User type for API operations
+#[derive(Debug, Clone)]
+pub struct User {
+    pub id: Option<String>,
+    pub access_key: String,
+    pub secret_key: String,
+    pub created_at: DateTime<Utc>,
+    pub is_admin: bool,
+    pub permissions: Vec<String>,
+}
+
+impl From<UserRecord> for User {
+    fn from(record: UserRecord) -> Self {
+        Self {
+            id: record.id.map(|v| v.to_string()),
+            access_key: record.access_key,
+            secret_key: record.secret_key,
+            created_at: DateTime::parse_from_rfc3339(&record.created_at)
+                .unwrap_or_else(|_| chrono::Utc::now().into())
+                .with_timezone(&Utc),
+            is_admin: record.is_admin,
+            permissions: record.permissions,
+        }
+    }
+}
+
+impl From<User> for UserRecord {
+    fn from(user: User) -> Self {
+        Self {
+            id: user.id.map(|id| serde_json::Value::String(id)),
+            access_key: user.access_key,
+            secret_key: user.secret_key,
+            created_at: user.created_at.to_rfc3339(),
+            is_admin: user.is_admin,
+            permissions: user.permissions,
+        }
+    }
 }
 
 /// Multipart upload tracking

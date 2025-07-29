@@ -21,7 +21,11 @@ pub fn App() -> impl IntoView {
         <div class="app">
             <Header/>
             <main class="main-content">
-                <HomePage/>
+                <div style="padding: 20px; background: white; margin: 20px; border-radius: 8px;">
+                    <h1>"ObjectIO Console"</h1>
+                    <p>"S3-Compatible Storage Management"</p>
+                    <BucketsPage/>
+                </div>
             </main>
         </div>
     }

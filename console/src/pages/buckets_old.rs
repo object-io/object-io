@@ -1,5 +1,5 @@
 use leptos::prelude::*;
-use wasm_bindgen_futures::spawn_local;
+use leptos_dom::logging::console_log;
 use crate::api;
 use crate::types::Bucket;
 use crate::components::CreateBucketModal;
@@ -13,16 +13,13 @@ pub fn BucketsPage() -> impl IntoView {
 
     // Load buckets on mount
     spawn_local(async move {
-        web_sys::console::log_1(&"Starting to load buckets...".into());
         set_loading.set(true);
         match api::list_buckets().await {
             Ok(bucket_list) => {
-                web_sys::console::log_1(&format!("Loaded {} buckets", bucket_list.len()).into());
                 set_buckets.set(bucket_list);
                 set_error.set(None);
             }
             Err(err) => {
-                web_sys::console::log_1(&format!("Error loading buckets: {}", err).into());
                 set_error.set(Some(err));
             }
         }
@@ -93,11 +90,20 @@ pub fn BucketsPage() -> impl IntoView {
                 }
             />
         </div>
-    }
-}
-
-#[component]
+    }#[component]
 fn BucketList(buckets: Vec<Bucket>) -> impl IntoView {
+    let format_size = |bytes: u64| {
+        if bytes < 1024 {
+            format!("{} B", bytes)
+        } else if bytes < 1024 * 1024 {
+            format!("{:.1} KB", bytes as f64 / 1024.0)
+        } else if bytes < 1024 * 1024 * 1024 {
+            format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+        } else {
+            format!("{:.1} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+        }
+    };
+
     view! {
         <div class="bucket-list">
             {buckets.into_iter().map(|bucket| {

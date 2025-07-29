@@ -24,6 +24,11 @@ pub mod health;
 pub async fn create_app() -> Result<Router> {
     info!("Initializing application state...");
     let state = AppState::new().await?;
+    
+    // Ensure admin user exists
+    // TODO: Re-enable after fixing authentication system
+    // crate::auth::ensure_admin_user(&state.metadata).await?;
+    
     info!("Application state initialized successfully");
     
     info!("Setting up routes and middleware...");
@@ -48,9 +53,11 @@ pub async fn create_app() -> Result<Router> {
         .route("/:bucket/:key", head(object::head_object))
         
         // Add application state
-        .with_state(state)
+        .with_state(state.clone())
         
         // Add middleware layers (applied in reverse order)
+        // TODO: Re-enable authentication middleware after fixing trait bounds
+        // .layer(middleware::from_fn_with_state(state.clone(), crate::auth::auth_middleware))
         .layer(middleware::from_fn(security_headers_middleware))
         .layer(middleware::from_fn(request_id_middleware))
         .layer(cors_layer())

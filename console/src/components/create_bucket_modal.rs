@@ -1,5 +1,5 @@
 use leptos::prelude::*;
-use leptos::task::spawn_local;
+use wasm_bindgen_futures::spawn_local;
 use crate::api;
 use crate::types::CreateBucketRequest;
 
@@ -12,48 +12,77 @@ pub fn CreateBucketModal<F>(
 where
     F: Fn() + 'static + Clone,
 {
-    let (bucket_name, set_bucket_name) = create_signal(String::new());
-    let (region, set_region) = create_signal("us-east-1".to_string());
-    let (creating, set_creating) = create_signal(false);
-    let (error, set_error) = create_signal(None::<String>);
+    let (bucket_name, set_bucket_name) = signal(String::new());
+    let (region, set_region) = signal("us-east-1".to_string());
+    let (creating, set_creating) = signal(false);
+    let (error, set_error) = signal(None::<String>);
 
-    let on_close_clone = on_close.clone();
-    let close_modal = move || {
-        set_bucket_name.set(String::new());
-        set_region.set("us-east-1".to_string());
-        set_creating.set(false);
-        set_error.set(None);
-        on_close_clone();
+    // Create closures that can be shared
+    let close_modal_1 = {
+        let on_close = on_close.clone();
+        move || {
+            set_bucket_name.set(String::new());
+            set_region.set("us-east-1".to_string());
+            set_creating.set(false);
+            set_error.set(None);
+            on_close();
+        }
     };
 
-    let create_bucket = move |_| {
-        let name = bucket_name.get();
-        if name.trim().is_empty() {
-            set_error.set(Some("Bucket name is required".to_string()));
-            return;
+    let close_modal_2 = {
+        let on_close = on_close.clone();
+        move || {
+            set_bucket_name.set(String::new());
+            set_region.set("us-east-1".to_string());
+            set_creating.set(false);
+            set_error.set(None);
+            on_close();
         }
+    };
 
-        set_creating.set(true);
-        set_error.set(None);
-        
-        let request = CreateBucketRequest {
-            name: name.clone(),
-            region: region.get(),
-        };
-        
-        let on_success_clone = on_success.clone();
-        spawn_local(async move {
-            match api::create_bucket(request).await {
-                Ok(_) => {
-                    on_success_clone(name);
-                    close_modal();
-                },
-                Err(err) => {
-                    set_error.set(Some(err));
-                    set_creating.set(false);
-                }
+    let close_modal_4 = {
+        let on_close = on_close.clone();
+        move || {
+            set_bucket_name.set(String::new());
+            set_region.set("us-east-1".to_string());
+            set_creating.set(false);
+            set_error.set(None);
+            on_close();
+        }
+    };
+
+    let create_bucket = {
+        let close_modal = close_modal_1.clone();
+        move |_| {
+            let name = bucket_name.get();
+            if name.trim().is_empty() {
+                set_error.set(Some("Bucket name is required".to_string()));
+                return;
             }
-        });
+
+            set_creating.set(true);
+            set_error.set(None);
+            
+            let request = CreateBucketRequest {
+                name: name.clone(),
+                region: region.get(),
+            };
+            
+            let on_success_clone = on_success.clone();
+            let close_modal = close_modal.clone();
+            spawn_local(async move {
+                match api::create_bucket(request).await {
+                    Ok(_) => {
+                        on_success_clone(name);
+                        close_modal();
+                    },
+                    Err(err) => {
+                        set_error.set(Some(err));
+                        set_creating.set(false);
+                    }
+                }
+            });
+        }
     };
 
     view! {
@@ -64,23 +93,21 @@ where
             } else { 
                 "display: none;" 
             }
-            on:click=move |e| {
-                if e.target() == e.current_target() {
-                    close_modal();
-                }
-            }
         >
-            <div 
-                class="modal-content"
-                style="background: white; border-radius: 1rem; padding: 2rem; width: 90%; max-width: 500px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);"
-            >
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div 
+                    class="modal-content"
+                    style="background: white; border-radius: 1rem; padding: 2rem; width: 90%; max-width: 500px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);"
+                >
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                     <h3 style="font-size: 1.25rem; font-weight: 600; color: #1f2937;">
                         "Create New Bucket"
                     </h3>
                     <button 
                         style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;"
-                        on:click=move |_| close_modal()
+                        on:click={
+                            let close_modal = close_modal_4.clone();
+                            move |_| close_modal()
+                        }
                     >
                         "×"
                     </button>
@@ -132,7 +159,10 @@ where
                     <button 
                         class="btn btn-secondary"
                         disabled=creating
-                        on:click=move |_| close_modal()
+                        on:click={
+                            let close_modal = close_modal_4.clone();
+                            move |_| close_modal()
+                        }
                     >
                         "Cancel"
                     </button>

@@ -310,22 +310,102 @@ impl MetadataOperations {
         Ok(())
     }
 
-    // User operations - TODO: Implement when User structure is finalized
+    // User operations
 
-    /// Create a new user (placeholder)
-    pub async fn create_user(
-        &self,
-        _access_key: &str,
-        _secret_key: &str,
-        _is_admin: bool,
-    ) -> Result<()> {
-        // TODO: Implement user creation
-        Ok(())
+    /// Create a new user
+    pub async fn create_user(&self, user: &User) -> Result<User> {
+        let user_record = UserRecord::from(user.clone());
+        
+        let created: Option<serde_json::Value> = self.db.connection()
+            .create(("user", uuid::Uuid::new_v4().to_string()))
+            .content(user_record)
+            .await
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to create user: {}", e),
+            })?;
+
+        let record_value = created
+            .ok_or_else(|| object_io_core::ObjectIOError::DatabaseError {
+                message: "No user record returned from creation".to_string(),
+            })?;
+
+        let record: UserRecord = serde_json::from_value(record_value)
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to deserialize user record: {}", e),
+            })?;
+
+        Ok(User::from(record))
     }
 
-    /// Get user by access key (placeholder)
-    pub async fn get_user(&self, _access_key: &str) -> Result<Option<()>> {
-        // TODO: Implement user retrieval
-        Ok(None)
+    /// Get user by access key
+    pub async fn get_user_by_access_key(&self, access_key: &str) -> Result<Option<User>> {
+        let results: Vec<UserRecord> = self.db.connection()
+            .query("SELECT * FROM user WHERE access_key = $access_key")
+            .bind(("access_key", access_key))
+            .await
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to query user: {}", e),
+            })?
+            .take(0)
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to parse user query result: {}", e),
+            })?;
+
+        if results.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(User::from(results[0].clone())))
+    }
+
+    /// Check if any admin users exist
+    pub async fn admin_user_exists(&self) -> Result<bool> {
+        let results: Vec<serde_json::Value> = self.db.connection()
+            .query("SELECT COUNT() as count FROM user WHERE is_admin = true")
+            .await
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to check admin users: {}", e),
+            })?
+            .take(0)
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to parse admin check result: {}", e),
+            })?;
+
+        if let Some(result) = results.first() {
+            if let Some(count) = result.get("count").and_then(|v| v.as_u64()) {
+                return Ok(count > 0);
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// List all users (admin only)
+    pub async fn list_users(&self) -> Result<Vec<User>> {
+        let results: Vec<UserRecord> = self.db.connection()
+            .query("SELECT * FROM user ORDER BY created_at DESC")
+            .await
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to list users: {}", e),
+            })?
+            .take(0)
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to parse user list result: {}", e),
+            })?;
+
+        Ok(results.into_iter().map(User::from).collect())
+    }
+
+    /// Delete user by access key
+    pub async fn delete_user(&self, access_key: &str) -> Result<()> {
+        self.db.connection()
+            .query("DELETE FROM user WHERE access_key = $access_key")
+            .bind(("access_key", access_key))
+            .await
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to delete user: {}", e),
+            })?;
+
+        Ok(())
     }
 }

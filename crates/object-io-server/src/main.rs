@@ -27,9 +27,9 @@ async fn main() -> Result<()> {
     
     let _host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let port = std::env::var("PORT")
-        .unwrap_or_else(|_| "3000".to_string())
+        .unwrap_or_else(|_| "5500".to_string())
         .parse::<u16>()
-        .unwrap_or(3000);
+        .unwrap_or(5500);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!("Server listening on {}", addr);
