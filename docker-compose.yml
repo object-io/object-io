@@ -21,7 +21,7 @@ services:
       - SURREAL_PASS=objectio_secure_2025
       
       # Redis Configuration
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASS:-objectio_redis_2025}@redis:6379
       
       # Storage Configuration
       - STORAGE_PATH=/app/data

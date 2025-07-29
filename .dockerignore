@@ -1,9 +1,9 @@
 # Rust build artifacts
 target/
-Cargo.lock
 
-# Console directory (separate repo)
-console/
+# Console built assets (keep source for building)
+console/dist/
+console/target/
 
 # Logs and temporary files
 *.log
@@ -24,11 +24,7 @@ tmp/
 .gitignore
 
 # Documentation
-README.md
 docs/
-
-# Tests (exclude from production builds)
-tests/
 
 # OS specific
 .DS_Store

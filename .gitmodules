@@ -1,4 +1,0 @@
-[submodule "console"]
-    path = console
-    url = https://github.com/object-io/console.git
-    branch = main
