@@ -1,3 +1,7 @@
+<div align="left">
+  <img src="https://avatars.githubusercontent.com/u/223274136?s=200&v=4" alt="ObjectIO Logo" width="100" height="100"/>
+</div>
+
 # ObjectIO - S3-Compatible Object Storage
 
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://opensource.org/licenses/MIT)
