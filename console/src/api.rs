@@ -3,7 +3,7 @@ use gloo_net::http::Request;
 use serde::Deserialize;
 use chrono::{DateTime, Utc};
 
-const API_BASE: &str = "http://localhost:5500";
+const API_BASE: &str = "http://localhost:58080";
 
 /// S3-compatible list buckets response
 #[derive(Debug, Deserialize)]
