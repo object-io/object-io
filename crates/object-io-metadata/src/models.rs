@@ -1,16 +1,16 @@
 //! Metadata models for database operations
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Database representation of a bucket
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BucketRecord {
-    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<serde_json::Value>,
     pub name: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: String,
+    pub updated_at: String,
     pub owner: String,
     pub acl: HashMap<String, String>,
 }
@@ -18,13 +18,14 @@ pub struct BucketRecord {
 /// Database representation of an object
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObjectRecord {
-    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<serde_json::Value>,
     pub key: String,
     pub bucket: String,
     pub size: u64,
     pub content_type: String,
     pub etag: String,
-    pub last_modified: DateTime<Utc>,
+    pub last_modified: String,
     pub storage_path: String,
     pub metadata: HashMap<String, String>,
 }
@@ -32,10 +33,11 @@ pub struct ObjectRecord {
 /// Database representation of a user
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserRecord {
-    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<serde_json::Value>,
     pub access_key: String,
     pub secret_key: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: String,
     pub is_admin: bool,
     pub permissions: Vec<String>,
 }
@@ -43,11 +45,12 @@ pub struct UserRecord {
 /// Multipart upload tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MultipartUpload {
-    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<serde_json::Value>,
     pub upload_id: String,
     pub bucket: String,
     pub key: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: String,
     pub parts: Vec<PartInfo>,
 }
 

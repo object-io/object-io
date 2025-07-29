@@ -1,7 +1,7 @@
 //! Metadata operations for buckets, objects, and users
 
 use crate::{database::Database, models::*};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use object_io_core::{Bucket, Object, ObjectInfo, Result};
 use std::collections::HashMap;
 
@@ -20,31 +20,41 @@ impl MetadataOperations {
     
     /// Create a new bucket
     pub async fn create_bucket(&self, name: &str, owner: &str) -> Result<Bucket> {
+        let now = Utc::now();
         let bucket_record = BucketRecord {
             id: None,
             name: name.to_string(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: now.to_rfc3339(),
+            updated_at: now.to_rfc3339(),
             owner: owner.to_string(),
             acl: HashMap::new(),
         };
 
-        let result: Vec<BucketRecord> = self.db.connection()
-            .create("bucket")
+        let created: Option<serde_json::Value> = self.db.connection()
+            .create(("bucket", uuid::Uuid::new_v4().to_string()))
             .content(bucket_record)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
                 message: format!("Failed to create bucket: {}", e),
             })?;
 
-        let record = result.into_iter().next()
+        let record_value = created
             .ok_or_else(|| object_io_core::ObjectIOError::DatabaseError {
                 message: "No bucket record returned from creation".to_string(),
             })?;
 
+        let record: BucketRecord = serde_json::from_value(record_value)
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to deserialize bucket record: {}", e),
+            })?;
+
         Ok(Bucket {
             name: record.name,
-            created_at: record.created_at,
+            created_at: DateTime::parse_from_rfc3339(&record.created_at)
+                .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                    message: format!("Failed to parse created_at: {}", e),
+                })?
+                .with_timezone(&Utc),
             region: "us-east-1".to_string(), // Default region
             versioning: object_io_core::VersioningStatus::default(),
             access_control: object_io_core::AccessControl {
@@ -53,7 +63,11 @@ impl MetadataOperations {
                     name: record.owner.clone(),
                     email: format!("{}@localhost", record.owner),
                     access_keys: vec![],
-                    created_at: record.created_at,
+                    created_at: DateTime::parse_from_rfc3339(&record.created_at)
+                        .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                            message: format!("Failed to parse created_at: {}", e),
+                        })?
+                        .with_timezone(&Utc),
                 },
                 acl: vec![],
                 policy: None,
@@ -77,7 +91,9 @@ impl MetadataOperations {
 
         Ok(result.into_iter().next().map(|record| Bucket {
             name: record.name,
-            created_at: record.created_at,
+            created_at: DateTime::parse_from_rfc3339(&record.created_at)
+                .unwrap_or_else(|_| Utc::now().into())
+                .with_timezone(&Utc),
             region: "us-east-1".to_string(), // Default region
             versioning: object_io_core::VersioningStatus::default(),
             access_control: object_io_core::AccessControl {
@@ -86,7 +102,9 @@ impl MetadataOperations {
                     name: record.owner.clone(),
                     email: format!("{}@localhost", record.owner),
                     access_keys: vec![],
-                    created_at: record.created_at,
+                    created_at: DateTime::parse_from_rfc3339(&record.created_at)
+                        .unwrap_or_else(|_| Utc::now().into())
+                        .with_timezone(&Utc),
                 },
                 acl: vec![],
                 policy: None,
@@ -110,7 +128,9 @@ impl MetadataOperations {
 
         Ok(result.into_iter().map(|record| Bucket {
             name: record.name,
-            created_at: record.created_at,
+            created_at: DateTime::parse_from_rfc3339(&record.created_at)
+                .unwrap_or_else(|_| Utc::now().into())
+                .with_timezone(&Utc),
             region: "us-east-1".to_string(), // Default region
             versioning: object_io_core::VersioningStatus::default(),
             access_control: object_io_core::AccessControl {
@@ -119,7 +139,9 @@ impl MetadataOperations {
                     name: record.owner.clone(),
                     email: format!("{}@localhost", record.owner),
                     access_keys: vec![],
-                    created_at: record.created_at,
+                    created_at: DateTime::parse_from_rfc3339(&record.created_at)
+                        .unwrap_or_else(|_| Utc::now().into())
+                        .with_timezone(&Utc),
                 },
                 acl: vec![],
                 policy: None,
@@ -160,27 +182,36 @@ impl MetadataOperations {
             size,
             content_type: content_type.to_string(),
             etag: etag.to_string(),
-            last_modified: Utc::now(),
+            last_modified: Utc::now().to_rfc3339(),
             storage_path: storage_path.to_string(),
             metadata,
         };
 
-        let result: Vec<ObjectRecord> = self.db.connection()
-            .create("object")
+        let created: Option<serde_json::Value> = self.db.connection()
+            .create(("object", uuid::Uuid::new_v4().to_string()))
             .content(object_record)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
                 message: format!("Failed to store object metadata: {}", e),
             })?;
 
-        let record = result.into_iter().next()
+        let record_value = created
             .ok_or_else(|| object_io_core::ObjectIOError::DatabaseError {
                 message: "No object record returned from creation".to_string(),
             })?;
 
+        let record: ObjectRecord = serde_json::from_value(record_value)
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to deserialize object record: {}", e),
+            })?;
+
         Ok(ObjectInfo {
             key: record.key,
-            last_modified: record.last_modified,
+            last_modified: DateTime::parse_from_rfc3339(&record.last_modified)
+                .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                    message: format!("Failed to parse last_modified: {}", e),
+                })?
+                .with_timezone(&Utc),
             etag: record.etag,
             size: record.size,
             storage_class: "STANDARD".to_string(),
@@ -204,7 +235,9 @@ impl MetadataOperations {
 
         Ok(result.into_iter().next().map(|record| ObjectInfo {
             key: record.key,
-            last_modified: record.last_modified,
+            last_modified: DateTime::parse_from_rfc3339(&record.last_modified)
+                .unwrap_or_else(|_| Utc::now().into())
+                .with_timezone(&Utc),
             etag: record.etag,
             size: record.size,
             storage_class: "STANDARD".to_string(),
@@ -222,8 +255,8 @@ impl MetadataOperations {
         let mut params = vec![("bucket", bucket.to_string())];
 
         if let Some(prefix) = prefix {
-            query.push_str(" AND key LIKE $prefix");
-            params.push(("prefix", format!("{}%", prefix)));
+            query.push_str(" AND string::startsWith(key, $prefix)");
+            params.push(("prefix", prefix.to_string()));
         }
 
         query.push_str(" ORDER BY key");
@@ -253,7 +286,9 @@ impl MetadataOperations {
             bucket: record.bucket,
             size: record.size,
             etag: record.etag,
-            last_modified: record.last_modified,
+            last_modified: DateTime::parse_from_rfc3339(&record.last_modified)
+                .unwrap_or_else(|_| Utc::now().into())
+                .with_timezone(&Utc),
             content_type: record.content_type,
             content_encoding: None,
             metadata: record.metadata,

@@ -37,8 +37,8 @@ impl Database {
         self.db.query("
             DEFINE TABLE bucket SCHEMAFULL;
             DEFINE FIELD name ON TABLE bucket TYPE string;
-            DEFINE FIELD created_at ON TABLE bucket TYPE datetime;
-            DEFINE FIELD updated_at ON TABLE bucket TYPE datetime;
+            DEFINE FIELD created_at ON TABLE bucket TYPE string;
+            DEFINE FIELD updated_at ON TABLE bucket TYPE string;
             DEFINE FIELD owner ON TABLE bucket TYPE string;
             DEFINE FIELD acl ON TABLE bucket TYPE object;
             DEFINE INDEX bucket_name ON TABLE bucket COLUMNS name UNIQUE;
@@ -54,7 +54,7 @@ impl Database {
             DEFINE FIELD size ON TABLE object TYPE int;
             DEFINE FIELD content_type ON TABLE object TYPE string;
             DEFINE FIELD etag ON TABLE object TYPE string;
-            DEFINE FIELD last_modified ON TABLE object TYPE datetime;
+            DEFINE FIELD last_modified ON TABLE object TYPE string;
             DEFINE FIELD storage_path ON TABLE object TYPE string;
             DEFINE FIELD metadata ON TABLE object TYPE object;
             DEFINE INDEX object_bucket_key ON TABLE object COLUMNS bucket, key UNIQUE;
@@ -67,7 +67,7 @@ impl Database {
             DEFINE TABLE user SCHEMAFULL;
             DEFINE FIELD access_key ON TABLE user TYPE string;
             DEFINE FIELD secret_key ON TABLE user TYPE string;
-            DEFINE FIELD created_at ON TABLE user TYPE datetime;
+            DEFINE FIELD created_at ON TABLE user TYPE string;
             DEFINE FIELD is_admin ON TABLE user TYPE bool;
             DEFINE FIELD permissions ON TABLE user TYPE array;
             DEFINE INDEX user_access_key ON TABLE user COLUMNS access_key UNIQUE;
