@@ -1,6 +1,7 @@
 //! Application state and configuration
 
 use object_io_metadata::{Database, MetadataOperations};
+use object_io_storage::{filesystem::FilesystemStorage, Storage};
 use std::sync::Arc;
 
 /// Application state shared across handlers
@@ -8,6 +9,8 @@ use std::sync::Arc;
 pub struct AppState {
     /// Database operations
     pub metadata: Arc<MetadataOperations>,
+    /// Storage backend
+    pub storage: Arc<dyn Storage>,
     /// Server configuration
     pub config: Arc<ServerConfig>,
 }
@@ -69,8 +72,12 @@ impl AppState {
         
         let metadata = Arc::new(MetadataOperations::new(database));
         
+        // Initialize filesystem storage backend
+        let storage = Arc::new(FilesystemStorage::new(&config.storage_path).await?) as Arc<dyn Storage>;
+        
         Ok(Self {
             metadata,
+            storage,
             config,
         })
     }

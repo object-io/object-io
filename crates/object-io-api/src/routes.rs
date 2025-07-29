@@ -2,7 +2,7 @@
 
 use axum::{
     middleware,
-    routing::get,
+    routing::{delete, get, head, put},
     Router,
 };
 use object_io_core::Result;
@@ -10,6 +10,7 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use crate::{
+    handlers::{bucket, object},
     middleware::{
         cors_layer, timeout_layer, body_limit_layer,
         request_id_middleware, security_headers_middleware
@@ -30,8 +31,21 @@ pub async fn create_app() -> Result<Router> {
         // Health check endpoint
         .route("/health", get(health::health_check))
         
-        // Root endpoint - S3 service description
-        .route("/", get(|| async { "ObjectIO S3-Compatible Storage Server" }))
+        // S3 API routes
+        // Root endpoint - List buckets
+        .route("/", get(bucket::list_buckets))
+        
+        // Bucket operations
+        .route("/:bucket", put(bucket::create_bucket))
+        .route("/:bucket", delete(bucket::delete_bucket))
+        .route("/:bucket", head(bucket::head_bucket))
+        .route("/:bucket", get(bucket::get_bucket_location))
+        
+        // Object operations
+        .route("/:bucket/:key", put(object::put_object))
+        .route("/:bucket/:key", get(object::get_object))
+        .route("/:bucket/:key", delete(object::delete_object))
+        .route("/:bucket/:key", head(object::head_object))
         
         // Add application state
         .with_state(state)

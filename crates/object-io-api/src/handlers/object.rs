@@ -2,15 +2,15 @@
 
 use axum::{
     body::Body,
-    extract::{Path, Query},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
-    response::{Json, Response},
-    Extension,
+    response::Response,
 };
-use object_io_core::Result as CoreResult;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
-use tokio_util::io::ReaderStream;
+use futures::StreamExt;
+use serde::Deserialize;
+use std::collections::HashMap;
+use tokio::io::AsyncReadExt;
+use crate::state::AppState;
 
 /// Put object parameters
 #[derive(Debug, Deserialize)]
@@ -30,200 +30,207 @@ pub struct GetObjectQuery {
     pub response_content_disposition: Option<String>,
 }
 
-/// List objects parameters
-#[derive(Debug, Deserialize)]
-pub struct ListObjectsQuery {
-    pub prefix: Option<String>,
-    pub delimiter: Option<String>,
-    pub marker: Option<String>,
-    #[serde(rename = "max-keys")]
-    pub max_keys: Option<u32>,
-    #[serde(rename = "list-type")]
-    pub list_type: Option<u32>,
-    #[serde(rename = "continuation-token")]
-    pub continuation_token: Option<String>,
-}
-
-/// List objects response
-#[derive(Debug, Serialize)]
-pub struct ListObjectsResponse {
-    pub name: String,
-    pub prefix: Option<String>,
-    pub delimiter: Option<String>,
-    pub max_keys: u32,
-    pub is_truncated: bool,
-    pub contents: Vec<ObjectSummary>,
-    pub common_prefixes: Vec<CommonPrefix>,
-    pub next_continuation_token: Option<String>,
-}
-
-/// Object summary for listing
-#[derive(Debug, Serialize)]
-pub struct ObjectSummary {
-    pub key: String,
-    pub last_modified: String,
-    pub etag: String,
-    pub size: u64,
-    pub storage_class: String,
-}
-
-/// Common prefix for listing
-#[derive(Debug, Serialize)]
-pub struct CommonPrefix {
-    pub prefix: String,
-}
-
 /// Put object handler (PUT /{bucket}/{key+})
 pub async fn put_object(
     Path((bucket, key)): Path<(String, String)>,
-    Query(params): Query<PutObjectQuery>,
+    State(state): State<AppState>,
+    Query(_params): Query<PutObjectQuery>,
     headers: HeaderMap,
     body: Body,
-    Extension(storage): Extension<Arc<dyn object_io_storage::Storage>>,
 ) -> std::result::Result<Response, StatusCode> {
-    // Convert body to bytes
-    let bytes = match axum::body::to_bytes(body, usize::MAX).await {
-        Ok(bytes) => bytes,
-        Err(_) => return Err(StatusCode::BAD_REQUEST),
-    };
-
-    // Prepare metadata
-    let mut metadata = HashMap::new();
-    if let Some(content_type) = params.content_type {
-        metadata.insert("content-type".to_string(), content_type);
+    // Check if bucket exists
+    match state.metadata.get_bucket(&bucket).await {
+        Ok(Some(_)) => {},
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            eprintln!("Failed to check bucket '{}': {}", bucket, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
     }
 
-    // Extract additional metadata from headers
+    // Extract metadata from headers
+    let mut metadata = HashMap::new();
+    
+    // Add content type
+    if let Some(content_type) = headers.get("content-type") {
+        if let Ok(ct_str) = content_type.to_str() {
+            metadata.insert("content-type".to_string(), ct_str.to_string());
+        }
+    }
+
+    // Add custom metadata (x-amz-meta-* headers)
     for (name, value) in headers.iter() {
-        let name_str = name.as_str();
-        if name_str.starts_with("x-amz-meta-") {
+        if let Some(name_str) = name.as_str().strip_prefix("x-amz-meta-") {
             if let Ok(value_str) = value.to_str() {
                 metadata.insert(name_str.to_string(), value_str.to_string());
             }
         }
     }
 
-    // Create a reader from bytes
-    let reader = std::io::Cursor::new(bytes.clone());
-    let boxed_reader: Box<dyn tokio::io::AsyncRead + Send + Unpin> = Box::new(reader);
+    // Convert body to async reader
+    let body_stream = tokio_util::io::StreamReader::new(
+        body.into_data_stream().map(|result| {
+            result.map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
+        })
+    );
 
-    // Store the object
-    match storage.put_object(&bucket, &key, boxed_reader, metadata).await {
+    // Store object
+    match state.storage.put_object(&bucket, &key, Box::new(body_stream), metadata).await {
         Ok(etag) => {
-            let mut response = Response::new(Body::empty());
-            *response.status_mut() = StatusCode::OK;
-            response.headers_mut().insert("ETag", etag.parse::<axum::http::HeaderValue>().unwrap());
+            let response = Response::builder()
+                .status(StatusCode::OK)
+                .header("ETag", format!("\"{}\"", etag))
+                .body(Body::empty())
+                .unwrap();
             Ok(response)
         }
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Err(e) => {
+            eprintln!("Failed to store object '{}/{}': {}", bucket, key, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
 
 /// Get object handler (GET /{bucket}/{key+})
 pub async fn get_object(
     Path((bucket, key)): Path<(String, String)>,
-    Query(params): Query<GetObjectQuery>,
-    Extension(storage): Extension<Arc<dyn object_io_storage::Storage>>,
+    State(state): State<AppState>,
+    Query(_params): Query<GetObjectQuery>,
 ) -> std::result::Result<Response, StatusCode> {
-    match storage.get_object(&bucket, &key).await {
-        Ok(reader) => {
-            // Convert the reader to a stream
-            let stream = ReaderStream::new(reader);
-            let body = Body::from_stream(stream);
-            
-            let mut response = Response::new(body);
-            *response.status_mut() = StatusCode::OK;
-            
-            // Add custom response headers if specified
-            if let Some(content_type) = params.response_content_type {
-                response.headers_mut().insert("Content-Type", content_type.parse::<axum::http::HeaderValue>().unwrap());
+    // Check if bucket exists
+    match state.metadata.get_bucket(&bucket).await {
+        Ok(Some(_)) => {},
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            eprintln!("Failed to check bucket '{}': {}", bucket, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // Get object from storage
+    match state.storage.get_object(&bucket, &key).await {
+        Ok(mut reader) => {
+            // Get object metadata for headers
+            let metadata = match state.storage.get_object_metadata(&bucket, &key).await {
+                Ok(meta) => meta,
+                Err(_) => HashMap::new(),
+            };
+
+            // Create response with appropriate headers
+            let mut response_builder = Response::builder().status(StatusCode::OK);
+
+            // Set content type
+            if let Some(content_type) = metadata.get("content-type") {
+                response_builder = response_builder.header("content-type", content_type);
+            } else {
+                response_builder = response_builder.header("content-type", "application/octet-stream");
             }
-            if let Some(disposition) = params.response_content_disposition {
-                response.headers_mut().insert("Content-Disposition", disposition.parse::<axum::http::HeaderValue>().unwrap());
+
+            // Read the data to create body
+            let mut buffer = Vec::new();
+            if let Err(e) = reader.read_to_end(&mut buffer).await {
+                eprintln!("Failed to read object data: {}", e);
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
             }
-            
+
+            let response = response_builder
+                .body(Body::from(buffer))
+                .unwrap();
             Ok(response)
         }
-        Err(_) => Err(StatusCode::NOT_FOUND),
+        Err(object_io_core::ObjectIOError::ObjectNotFound { .. }) => {
+            Err(StatusCode::NOT_FOUND)
+        }
+        Err(e) => {
+            eprintln!("Failed to get object '{}/{}': {}", bucket, key, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
 
 /// Head object handler (HEAD /{bucket}/{key+})
 pub async fn head_object(
     Path((bucket, key)): Path<(String, String)>,
-    Extension(storage): Extension<Arc<dyn object_io_storage::Storage>>,
+    State(state): State<AppState>,
 ) -> std::result::Result<Response, StatusCode> {
-    match storage.get_object_metadata(&bucket, &key).await {
-        Ok(metadata) => {
-            let mut response = Response::new(Body::empty());
-            *response.status_mut() = StatusCode::OK;
-            
-            // Add metadata headers
-            for (k, v) in metadata {
-                if let (Ok(header_name), Ok(header_value)) = (
-                    k.parse::<axum::http::HeaderName>(), 
-                    v.parse::<axum::http::HeaderValue>()
-                ) {
-                    response.headers_mut().insert(header_name, header_value);
+    // Check if bucket exists
+    match state.metadata.get_bucket(&bucket).await {
+        Ok(Some(_)) => {},
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            eprintln!("Failed to check bucket '{}': {}", bucket, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // Check if object exists and get metadata
+    match state.storage.object_exists(&bucket, &key).await {
+        Ok(true) => {
+            // Get object metadata for headers
+            let metadata = match state.storage.get_object_metadata(&bucket, &key).await {
+                Ok(meta) => meta,
+                Err(_) => HashMap::new(),
+            };
+
+            let mut response_builder = Response::builder().status(StatusCode::OK);
+
+            // Set content type
+            if let Some(content_type) = metadata.get("content-type") {
+                response_builder = response_builder.header("content-type", content_type);
+            } else {
+                response_builder = response_builder.header("content-type", "application/octet-stream");
+            }
+
+            // Add custom metadata as x-amz-meta-* headers
+            for (key, value) in metadata.iter() {
+                if !key.starts_with("content-") {
+                    response_builder = response_builder.header(
+                        format!("x-amz-meta-{}", key),
+                        value
+                    );
                 }
             }
-            
+
+            let response = response_builder
+                .body(Body::empty())
+                .unwrap();
             Ok(response)
         }
-        Err(_) => Err(StatusCode::NOT_FOUND),
+        Ok(false) => {
+            Err(StatusCode::NOT_FOUND)
+        }
+        Err(e) => {
+            eprintln!("Failed to check object '{}/{}': {}", bucket, key, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
 
 /// Delete object handler (DELETE /{bucket}/{key+})
 pub async fn delete_object(
     Path((bucket, key)): Path<(String, String)>,
-    Extension(storage): Extension<Arc<dyn object_io_storage::Storage>>,
+    State(state): State<AppState>,
 ) -> std::result::Result<StatusCode, StatusCode> {
-    match storage.delete_object(&bucket, &key).await {
-        Ok(_) => Ok(StatusCode::NO_CONTENT),
-        Err(_) => Err(StatusCode::NOT_FOUND),
-    }
-}
-
-/// List objects handler (GET /{bucket})
-pub async fn list_objects(
-    Path(bucket): Path<String>,
-    Query(params): Query<ListObjectsQuery>,
-    Extension(storage): Extension<Arc<dyn object_io_storage::Storage>>,
-) -> std::result::Result<Json<ListObjectsResponse>, StatusCode> {
-    let max_keys = params.max_keys.unwrap_or(1000).min(1000);
-    
-    match storage.list_objects(
-        &bucket,
-        params.prefix.as_deref(),
-        params.delimiter.as_deref(),
-        Some(max_keys),
-    ).await {
-        Ok(objects) => {
-            let contents: Vec<ObjectSummary> = objects
-                .into_iter()
-                .map(|obj| ObjectSummary {
-                    key: obj.key,
-                    last_modified: obj.last_modified.to_rfc3339(),
-                    etag: obj.etag,
-                    size: obj.size,
-                    storage_class: "STANDARD".to_string(),
-                })
-                .collect();
-            
-            let response = ListObjectsResponse {
-                name: bucket,
-                prefix: params.prefix,
-                delimiter: params.delimiter,
-                max_keys,
-                is_truncated: false, // TODO: Implement pagination
-                contents,
-                common_prefixes: vec![], // TODO: Implement common prefixes
-                next_continuation_token: None,
-            };
-            
-            Ok(Json(response))
+    // Check if bucket exists
+    match state.metadata.get_bucket(&bucket).await {
+        Ok(Some(_)) => {},
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            eprintln!("Failed to check bucket '{}': {}", bucket, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+
+    // Delete object from storage
+    match state.storage.delete_object(&bucket, &key).await {
+        Ok(()) => Ok(StatusCode::NO_CONTENT),
+        Err(object_io_core::ObjectIOError::ObjectNotFound { .. }) => {
+            // S3 returns 204 even if object doesn't exist
+            Ok(StatusCode::NO_CONTENT)
+        }
+        Err(e) => {
+            eprintln!("Failed to delete object '{}/{}': {}", bucket, key, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
