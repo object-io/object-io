@@ -31,3 +31,4 @@ node_modules/
 # Coverage reports
 /coverage/
 tarpaulin-report.html
+.vscode/mcp.json
