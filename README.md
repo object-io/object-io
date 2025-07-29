@@ -1,3 +1,7 @@
+<div align="left">
+  <img src="https://avatars.githubusercontent.com/u/223274136?s=200&v=4" alt="ObjectIO Logo" width="100" height="100"/>
+</div>
+
 # ObjectIO
 
 [![Build Status](https://github.com/devstroop/object-io/workflows/CI/badge.svg)](https://github.com/devstroop/object-io/actions)
@@ -21,21 +25,33 @@
 
 ObjectIO is designed as a modular system with the following components:
 
-```
-┌─────────────────┐    ┌─────────────────┐
-│   Web Console   │    │   S3 API Server │
-│    (Leptos)     │    │     (Axum)      │
-│  Management UI  │    │  REST Endpoint  │
-└─────────────────┘    └─────────────────┘
-         │                       │
-         └───────────────────────┼───────────────────────┐
-                                 │                       │
-         ┌───────────────────────┼───────────────────────┐
-         │                       │                       │
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Storage Engine │    │  Metadata Store │    │  Security Layer │
-│  (Configurable) │    │   (SurrealDB)   │    │ (Auth & Policies│
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+```mermaid
+graph TD
+    A[Web Console<br/>Leptos<br/>Management UI] --> D[Core Engine]
+    B[S3 API Server<br/>Axum<br/>REST Endpoint] --> D[Core Engine]
+
+    D --> E[Storage Engine<br/>Configurable]
+    D --> F[Metadata Store<br/>SurrealDB]
+    D --> G[Security Layer<br/>Auth & Policies]
+
+    E --> H[File System]
+    E --> I[Cloud Storage]
+    E --> J[Object Store]
+
+    F --> K[Buckets]
+    F --> L[Objects]
+    F --> M[Users & ACLs]
+
+    G --> N[AWS SigV4]
+    G --> O[Bucket Policies]
+    G --> P[Access Control]
+
+    style A fill:#e1f5fe
+    style B fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#fce4ec
+    style F fill:#f3e5f5
+    style G fill:#e0f2f1
 ```
 
 ### Core Components
