@@ -4,7 +4,7 @@
 #==============================================================================
 # Build Stage
 #==============================================================================
-FROM rust:1.83-slim as builder
+FROM rust:1.88-slim as builder
 
 # Install system dependencies for WebAssembly builds
 RUN apt-get update && apt-get install -y \

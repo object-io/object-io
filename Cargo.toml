@@ -2,9 +2,10 @@
 resolver = "2"
 members = [
     "crates/object-io-core",
-    "crates/object-io-storage",
+    "crates/object-io-storage", 
     "crates/object-io-api",
     "crates/object-io-metadata",
+    "crates/object-io-database",
     "crates/object-io-server",
 ]
 
@@ -28,7 +29,7 @@ tower-http = { version = "0.5", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 quick-xml = { version = "0.31", features = ["serialize"] }
-surrealdb = { version = "1.1", features = ["kv-rocksdb"] }
+# Removed surrealdb - using custom embedded database instead
 sha2 = "0.10.8"
 hmac = "0.12.1"
 hex = "0.4"
@@ -45,11 +46,9 @@ bytes = "1.5"
 futures = "0.3"
 tokio-util = "0.7"
 tempfile = "3.8"
+# Simple embedded database dependencies
+sled = "0.34"  # Fast embedded database
+bincode = "1.3"  # Binary serialization
 # Testing
 tokio-test = "0.4"
 async-trait = "0.1"
-
-# Pin to avoid edition2024 requirement
-base64ct = "=1.6.0"
-argon2 = "=0.5.2"
-password-hash = "=0.4.2"

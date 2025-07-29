@@ -1,25 +1,38 @@
 [package]
-name = "object-io-metadata"
+name = "object-io-database"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Metadata management and database integration for ObjectIO"
 homepage.workspace = true
 repository.workspace = true
+description = "ObjectIO embedded database for metadata storage"
+readme = "README.md"
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
+# Core dependencies
 object-io-core = { path = "../object-io-core" }
-object-io-database = { path = "../object-io-database" }
 
+# Async runtime
 tokio.workspace = true
+
+# Serialization
 serde.workspace = true
 serde_json.workspace = true
-chrono.workspace = true
+bincode.workspace = true
+
+# Database storage
+sled.workspace = true
+
+# Utilities
 uuid.workspace = true
+chrono.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+async-trait.workspace = true
 
 [dev-dependencies]
 tokio-test.workspace = true

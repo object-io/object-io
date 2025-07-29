@@ -1,9 +1,9 @@
 //! Metadata operations for buckets, objects, and users
 
 use crate::{database::Database, models::*};
-use chrono::{DateTime, Utc};
-use object_io_core::{Bucket, Object, ObjectInfo, Result};
-use std::collections::HashMap;
+use object_io_core::{Bucket, Object, ObjectInfo, Result, StorageClass, VersioningStatus, AccessControl, User};
+use object_io_database::{BucketInfo, ObjectInfo as DbObjectInfo, UserInfo};
+use uuid::Uuid;
 
 /// Metadata operations interface
 pub struct MetadataOperations {
@@ -20,54 +20,31 @@ impl MetadataOperations {
     
     /// Create a new bucket
     pub async fn create_bucket(&self, name: &str, owner: &str) -> Result<Bucket> {
-        let now = Utc::now();
-        let bucket_record = BucketRecord {
-            id: None,
-            name: name.to_string(),
-            created_at: now.to_rfc3339(),
-            updated_at: now.to_rfc3339(),
-            owner: owner.to_string(),
-            acl: HashMap::new(),
-        };
+        let bucket_info = BucketInfo::new(
+            name.to_string(),
+            owner.to_string(),
+            "us-east-1".to_string(), // Default region
+        );
 
-        let created: Option<serde_json::Value> = self.db.connection()
-            .create(("bucket", uuid::Uuid::new_v4().to_string()))
-            .content(bucket_record)
+        self.db.connection()
+            .create_bucket(bucket_info.clone())
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
                 message: format!("Failed to create bucket: {}", e),
             })?;
 
-        let record_value = created
-            .ok_or_else(|| object_io_core::ObjectIOError::DatabaseError {
-                message: "No bucket record returned from creation".to_string(),
-            })?;
-
-        let record: BucketRecord = serde_json::from_value(record_value)
-            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to deserialize bucket record: {}", e),
-            })?;
-
         Ok(Bucket {
-            name: record.name,
-            created_at: DateTime::parse_from_rfc3339(&record.created_at)
-                .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                    message: format!("Failed to parse created_at: {}", e),
-                })?
-                .with_timezone(&Utc),
-            region: "us-east-1".to_string(), // Default region
-            versioning: object_io_core::VersioningStatus::default(),
-            access_control: object_io_core::AccessControl {
-                owner: object_io_core::User {
-                    id: uuid::Uuid::new_v4(),
-                    name: record.owner.clone(),
-                    email: format!("{}@localhost", record.owner),
+            name: bucket_info.name,
+            created_at: bucket_info.created_at,
+            region: bucket_info.region,
+            versioning: VersioningStatus::Unversioned,
+            access_control: AccessControl {
+                owner: User {
+                    id: Uuid::new_v4(),
+                    name: bucket_info.owner,
+                    email: "owner@objectio.local".to_string(),
                     access_keys: vec![],
-                    created_at: DateTime::parse_from_rfc3339(&record.created_at)
-                        .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                            message: format!("Failed to parse created_at: {}", e),
-                        })?
-                        .with_timezone(&Utc),
+                    created_at: bucket_info.created_at,
                 },
                 acl: vec![],
                 policy: None,
@@ -77,71 +54,59 @@ impl MetadataOperations {
 
     /// Get bucket by name
     pub async fn get_bucket(&self, name: &str) -> Result<Option<Bucket>> {
-        let result: Vec<BucketRecord> = self.db.connection()
-            .query("SELECT * FROM bucket WHERE name = $name")
-            .bind(("name", name))
+        match self.db.connection()
+            .get_bucket(name)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to query bucket: {}", e),
-            })?
-            .take(0)
-            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to parse bucket query result: {}", e),
-            })?;
-
-        Ok(result.into_iter().next().map(|record| Bucket {
-            name: record.name,
-            created_at: DateTime::parse_from_rfc3339(&record.created_at)
-                .unwrap_or_else(|_| Utc::now().into())
-                .with_timezone(&Utc),
-            region: "us-east-1".to_string(), // Default region
-            versioning: object_io_core::VersioningStatus::default(),
-            access_control: object_io_core::AccessControl {
-                owner: object_io_core::User {
-                    id: uuid::Uuid::new_v4(),
-                    name: record.owner.clone(),
-                    email: format!("{}@localhost", record.owner),
-                    access_keys: vec![],
-                    created_at: DateTime::parse_from_rfc3339(&record.created_at)
-                        .unwrap_or_else(|_| Utc::now().into())
-                        .with_timezone(&Utc),
+                message: format!("Failed to get bucket: {}", e),
+            })? {
+            Some(bucket_info) => Ok(Some(Bucket {
+                name: bucket_info.name,
+                created_at: bucket_info.created_at,
+                region: bucket_info.region,
+                versioning: VersioningStatus::Unversioned,
+                access_control: AccessControl {
+                    owner: User {
+                        id: Uuid::new_v4(),
+                        name: bucket_info.owner,
+                        email: "owner@objectio.local".to_string(),
+                        access_keys: vec![],
+                        created_at: bucket_info.created_at,
+                    },
+                    acl: vec![],
+                    policy: None,
                 },
-                acl: vec![],
-                policy: None,
-            },
-        }))
+            })),
+            None => Ok(None),
+        }
     }
 
-    /// List all buckets for a user
+    /// Check if bucket exists
+    pub async fn bucket_exists(&self, name: &str) -> Result<bool> {
+        Ok(self.get_bucket(name).await?.is_some())
+    }
+
+    /// List buckets for owner
     pub async fn list_buckets(&self, owner: &str) -> Result<Vec<Bucket>> {
-        let result: Vec<BucketRecord> = self.db.connection()
-            .query("SELECT * FROM bucket WHERE owner = $owner ORDER BY created_at")
-            .bind(("owner", owner))
+        let bucket_infos = self.db.connection()
+            .list_buckets_by_owner(owner)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
                 message: format!("Failed to list buckets: {}", e),
-            })?
-            .take(0)
-            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to parse bucket list result: {}", e),
             })?;
 
-        Ok(result.into_iter().map(|record| Bucket {
-            name: record.name,
-            created_at: DateTime::parse_from_rfc3339(&record.created_at)
-                .unwrap_or_else(|_| Utc::now().into())
-                .with_timezone(&Utc),
-            region: "us-east-1".to_string(), // Default region
-            versioning: object_io_core::VersioningStatus::default(),
-            access_control: object_io_core::AccessControl {
-                owner: object_io_core::User {
-                    id: uuid::Uuid::new_v4(),
-                    name: record.owner.clone(),
-                    email: format!("{}@localhost", record.owner),
+        Ok(bucket_infos.into_iter().map(|info| Bucket {
+            name: info.name,
+            created_at: info.created_at,
+            region: info.region,
+            versioning: VersioningStatus::Unversioned,
+            access_control: AccessControl {
+                owner: User {
+                    id: Uuid::new_v4(),
+                    name: info.owner,
+                    email: "owner@objectio.local".to_string(),
                     access_keys: vec![],
-                    created_at: DateTime::parse_from_rfc3339(&record.created_at)
-                        .unwrap_or_else(|_| Utc::now().into())
-                        .with_timezone(&Utc),
+                    created_at: info.created_at,
                 },
                 acl: vec![],
                 policy: None,
@@ -149,263 +114,200 @@ impl MetadataOperations {
         }).collect())
     }
 
-    /// Delete a bucket
-    pub async fn delete_bucket(&self, name: &str) -> Result<()> {
-        self.db.connection()
-            .query("DELETE FROM bucket WHERE name = $name")
-            .bind(("name", name))
+    /// Delete bucket
+    pub async fn delete_bucket(&self, name: &str) -> Result<bool> {
+        // First delete all objects in the bucket
+        let _deleted_objects = self.db.connection()
+            .delete_all_objects_in_bucket(name)
+            .await
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to delete objects in bucket: {}", e),
+            })?;
+
+        // Then delete the bucket itself
+        let deleted = self.db.connection()
+            .delete_bucket(name)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
                 message: format!("Failed to delete bucket: {}", e),
             })?;
 
-        Ok(())
+        Ok(deleted)
     }
 
     // Object operations
 
     /// Store object metadata
-    pub async fn put_object_metadata(
-        &self,
-        bucket: &str,
-        key: &str,
-        size: u64,
-        content_type: &str,
-        etag: &str,
-        storage_path: &str,
-        metadata: HashMap<String, String>,
-    ) -> Result<ObjectInfo> {
-        let object_record = ObjectRecord {
-            id: None,
-            key: key.to_string(),
-            bucket: bucket.to_string(),
-            size,
-            content_type: content_type.to_string(),
-            etag: etag.to_string(),
-            last_modified: Utc::now().to_rfc3339(),
-            storage_path: storage_path.to_string(),
-            metadata,
-        };
+    pub async fn put_object(&self, bucket: &str, key: &str, object_info: &ObjectInfo) -> Result<()> {
+        let db_object_info = DbObjectInfo::new(
+            key.to_string(),
+            bucket.to_string(),
+            object_info.size,
+            "application/octet-stream".to_string(), // Default content type
+            object_info.etag.clone(),
+        );
 
-        let created: Option<serde_json::Value> = self.db.connection()
-            .create(("object", uuid::Uuid::new_v4().to_string()))
-            .content(object_record)
+        self.db.connection()
+            .put_object(db_object_info)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
                 message: format!("Failed to store object metadata: {}", e),
             })?;
 
-        let record_value = created
-            .ok_or_else(|| object_io_core::ObjectIOError::DatabaseError {
-                message: "No object record returned from creation".to_string(),
-            })?;
-
-        let record: ObjectRecord = serde_json::from_value(record_value)
-            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to deserialize object record: {}", e),
-            })?;
-
-        Ok(ObjectInfo {
-            key: record.key,
-            last_modified: DateTime::parse_from_rfc3339(&record.last_modified)
-                .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                    message: format!("Failed to parse last_modified: {}", e),
-                })?
-                .with_timezone(&Utc),
-            etag: record.etag,
-            size: record.size,
-            storage_class: "STANDARD".to_string(),
-        })
+        Ok(())
     }
 
     /// Get object metadata
-    pub async fn get_object_metadata(&self, bucket: &str, key: &str) -> Result<Option<ObjectInfo>> {
-        let result: Vec<ObjectRecord> = self.db.connection()
-            .query("SELECT * FROM object WHERE bucket = $bucket AND key = $key")
-            .bind(("bucket", bucket))
-            .bind(("key", key))
+    pub async fn get_object(&self, bucket: &str, key: &str) -> Result<Option<Object>> {
+        match self.db.connection()
+            .get_object(bucket, key)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to query object metadata: {}", e),
-            })?
-            .take(0)
-            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to parse object metadata result: {}", e),
-            })?;
-
-        Ok(result.into_iter().next().map(|record| ObjectInfo {
-            key: record.key,
-            last_modified: DateTime::parse_from_rfc3339(&record.last_modified)
-                .unwrap_or_else(|_| Utc::now().into())
-                .with_timezone(&Utc),
-            etag: record.etag,
-            size: record.size,
-            storage_class: "STANDARD".to_string(),
-        }))
+                message: format!("Failed to get object: {}", e),
+            })? {
+            Some(object_info) => Ok(Some(Object {
+                key: object_info.key,
+                bucket: object_info.bucket,
+                size: object_info.size,
+                etag: object_info.etag,
+                last_modified: object_info.last_modified,
+                content_type: object_info.content_type,
+                content_encoding: object_info.content_encoding,
+                metadata: object_info.metadata,
+                storage_class: StorageClass::Standard,
+            })),
+            None => Ok(None),
+        }
     }
 
-    /// List objects in a bucket
-    pub async fn list_objects(
-        &self,
-        bucket: &str,
-        prefix: Option<&str>,
-        max_keys: Option<u32>,
-    ) -> Result<Vec<Object>> {
-        let mut query = "SELECT * FROM object WHERE bucket = $bucket".to_string();
-        let mut params = vec![("bucket", bucket.to_string())];
-
-        if let Some(prefix) = prefix {
-            query.push_str(" AND string::startsWith(key, $prefix)");
-            params.push(("prefix", prefix.to_string()));
-        }
-
-        query.push_str(" ORDER BY key");
-
-        if let Some(limit) = max_keys {
-            query.push_str(" LIMIT $limit");
-            params.push(("limit", limit.to_string()));
-        }
-
-        let mut query_builder = self.db.connection().query(&query);
-        for (key, value) in params {
-            query_builder = query_builder.bind((key, value));
-        }
-
-        let result: Vec<ObjectRecord> = query_builder
+    /// List objects in bucket
+    pub async fn list_objects(&self, bucket: &str, prefix: Option<&str>, _max_keys: Option<u32>) -> Result<Vec<Object>> {
+        let object_infos = self.db.connection()
+            .list_objects(bucket, prefix)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
                 message: format!("Failed to list objects: {}", e),
-            })?
-            .take(0)
-            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to parse object list result: {}", e),
             })?;
 
-        Ok(result.into_iter().map(|record| Object {
-            key: record.key,
-            bucket: record.bucket,
-            size: record.size,
-            etag: record.etag,
-            last_modified: DateTime::parse_from_rfc3339(&record.last_modified)
-                .unwrap_or_else(|_| Utc::now().into())
-                .with_timezone(&Utc),
-            content_type: record.content_type,
-            content_encoding: None,
-            metadata: record.metadata,
-            storage_class: object_io_core::StorageClass::default(),
+        Ok(object_infos.into_iter().map(|info| Object {
+            key: info.key,
+            bucket: info.bucket,
+            size: info.size,
+            etag: info.etag,
+            last_modified: info.last_modified,
+            content_type: info.content_type,
+            content_encoding: info.content_encoding,
+            metadata: info.metadata,
+            storage_class: StorageClass::Standard,
         }).collect())
     }
 
-    /// Delete object metadata
-    pub async fn delete_object(&self, bucket: &str, key: &str) -> Result<()> {
+    /// Delete object
+    pub async fn delete_object(&self, bucket: &str, key: &str) -> Result<bool> {
         self.db.connection()
-            .query("DELETE FROM object WHERE bucket = $bucket AND key = $key")
-            .bind(("bucket", bucket))
-            .bind(("key", key))
+            .delete_object(bucket, key)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to delete object metadata: {}", e),
-            })?;
+                message: format!("Failed to delete object: {}", e),
+            })
+    }
 
-        Ok(())
+    /// Get object count for bucket
+    pub async fn get_object_count(&self, bucket: &str) -> Result<u64> {
+        self.db.connection()
+            .get_object_count(bucket)
+            .await
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to get object count: {}", e),
+            })
     }
 
     // User operations
 
-    /// Create a new user
-    pub async fn create_user(&self, user: &User) -> Result<User> {
-        let user_record = UserRecord::from(user.clone());
-        
-        let created: Option<serde_json::Value> = self.db.connection()
-            .create(("user", uuid::Uuid::new_v4().to_string()))
-            .content(user_record)
+    /// Create user
+    pub async fn create_user(&self, access_key: &str, secret_key_hash: &str, display_name: &str) -> Result<()> {
+        let user_info = UserInfo::new(
+            uuid::Uuid::new_v4().to_string(),
+            access_key.to_string(),
+            secret_key_hash.to_string(),
+            display_name.to_string(),
+            format!("{}@objectio.local", access_key), // Default email
+        );
+
+        self.db.connection()
+            .create_user(user_info)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
                 message: format!("Failed to create user: {}", e),
             })?;
 
-        let record_value = created
-            .ok_or_else(|| object_io_core::ObjectIOError::DatabaseError {
-                message: "No user record returned from creation".to_string(),
-            })?;
-
-        let record: UserRecord = serde_json::from_value(record_value)
-            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to deserialize user record: {}", e),
-            })?;
-
-        Ok(User::from(record))
+        Ok(())
     }
 
     /// Get user by access key
-    pub async fn get_user_by_access_key(&self, access_key: &str) -> Result<Option<User>> {
-        let results: Vec<UserRecord> = self.db.connection()
-            .query("SELECT * FROM user WHERE access_key = $access_key")
-            .bind(("access_key", access_key))
+    pub async fn get_user_by_access_key(&self, access_key: &str) -> Result<Option<UserRecord>> {
+        match self.db.connection()
+            .get_user_by_access_key(access_key)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to query user: {}", e),
-            })?
-            .take(0)
-            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to parse user query result: {}", e),
-            })?;
-
-        if results.is_empty() {
-            return Ok(None);
+                message: format!("Failed to get user: {}", e),
+            })? {
+            Some(user_info) => Ok(Some(UserRecord {
+                id: Some(serde_json::Value::String(user_info.user_id)),
+                access_key: user_info.access_key,
+                secret_key: user_info.secret_key_hash,
+                created_at: user_info.created_at.to_rfc3339(),
+                is_admin: user_info.permissions.admin,
+                permissions: vec![], // Convert from our permissions structure if needed
+            })),
+            None => Ok(None),
         }
-
-        Ok(Some(User::from(results[0].clone())))
     }
 
     /// Check if any admin users exist
     pub async fn admin_user_exists(&self) -> Result<bool> {
-        let results: Vec<serde_json::Value> = self.db.connection()
-            .query("SELECT COUNT() as count FROM user WHERE is_admin = true")
-            .await
-            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to check admin users: {}", e),
-            })?
-            .take(0)
-            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to parse admin check result: {}", e),
-            })?;
-
-        if let Some(result) = results.first() {
-            if let Some(count) = result.get("count").and_then(|v| v.as_u64()) {
-                return Ok(count > 0);
-            }
-        }
-
-        Ok(false)
+        let users = self.list_users().await?;
+        Ok(users.iter().any(|user| user.is_admin))
     }
 
-    /// List all users (admin only)
-    pub async fn list_users(&self) -> Result<Vec<User>> {
-        let results: Vec<UserRecord> = self.db.connection()
-            .query("SELECT * FROM user ORDER BY created_at DESC")
+    /// Check if any users exist (for initial setup)
+    pub async fn user_count(&self) -> Result<u64> {
+        let users = self.db.connection()
+            .list_users()
+            .await
+            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
+                message: format!("Failed to count users: {}", e),
+            })?;
+
+        Ok(users.len() as u64)
+    }
+
+    /// List all users
+    pub async fn list_users(&self) -> Result<Vec<UserRecord>> {
+        let user_infos = self.db.connection()
+            .list_users()
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
                 message: format!("Failed to list users: {}", e),
-            })?
-            .take(0)
-            .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
-                message: format!("Failed to parse user list result: {}", e),
             })?;
 
-        Ok(results.into_iter().map(User::from).collect())
+        Ok(user_infos.into_iter().map(|info| UserRecord {
+            id: Some(serde_json::Value::String(info.user_id)),
+            access_key: info.access_key,
+            secret_key: info.secret_key_hash,
+            created_at: info.created_at.to_rfc3339(),
+            is_admin: info.permissions.admin,
+            permissions: vec![], // Convert from our permissions structure if needed
+        }).collect())
     }
 
-    /// Delete user by access key
-    pub async fn delete_user(&self, access_key: &str) -> Result<()> {
+    /// Delete user
+    pub async fn delete_user(&self, access_key: &str) -> Result<bool> {
         self.db.connection()
-            .query("DELETE FROM user WHERE access_key = $access_key")
-            .bind(("access_key", access_key))
+            .delete_user(access_key)
             .await
             .map_err(|e| object_io_core::ObjectIOError::DatabaseError {
                 message: format!("Failed to delete user: {}", e),
-            })?;
-
-        Ok(())
+            })
     }
 }

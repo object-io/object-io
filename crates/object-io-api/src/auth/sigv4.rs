@@ -3,11 +3,11 @@
 use axum::http::{HeaderMap, Method};
 use chrono::{DateTime, Utc};
 use hmac::{Hmac, Mac};
-use object_io_core::{ObjectIOError, Result};
+use object_io_core::ObjectIOError;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 
 type HmacSha256 = Hmac<Sha256>;
+type Result<T> = std::result::Result<T, ObjectIOError>;
 
 /// AWS SigV4 authentication context
 #[derive(Debug, Clone)]

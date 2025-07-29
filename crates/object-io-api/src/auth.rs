@@ -135,7 +135,7 @@ async fn authenticate_request(
 
     Ok(AuthContext {
         access_key: user.access_key,
-        user_id: user.id.unwrap_or_default(),
+        user_id: user.id.unwrap_or_default().to_string(),
         is_admin: user.is_admin,
     })
 }
@@ -175,20 +175,15 @@ pub async fn ensure_admin_user(metadata: &Arc<MetadataOperations>) -> Result<()>
     
     if !admin_exists {
         // Create default admin user
-        let admin_user = object_io_metadata::models::User {
-            id: None,
-            access_key: "AKIAOBJECTIO12345678".to_string(),
-            secret_key: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYzEXAMPLEKEY".to_string(),
-            created_at: chrono::Utc::now(),
-            is_admin: true,
-            permissions: vec!["s3:*".to_string()],
-        };
+        let access_key = "AKIAOBJECTIO12345678";
+        let secret_key = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYzEXAMPLEKEY";
+        let display_name = "Admin User";
 
-        metadata.create_user(&admin_user).await?;
+        metadata.create_user(access_key, secret_key, display_name).await?;
         
         println!("✅ Created default admin user:");
-        println!("   Access Key: {}", admin_user.access_key);
-        println!("   Secret Key: {}", admin_user.secret_key);
+        println!("   Access Key: {}", access_key);
+        println!("   Secret Key: {}", secret_key);
         println!("   ⚠️  Please change these credentials in production!");
     }
 
