@@ -1,18 +1,18 @@
 services:
   #============================================================================
-  # ObjectIO Server - Main S3-compatible API
+  # ObjectIO Server - Main S3-compatible API (Development Mode)
   #============================================================================
   objectio:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: objectio-server
+    container_name: objectio-server-dev
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
       # Application Configuration
-      - RUST_LOG=info
+      - RUST_LOG=debug
       - HOST=0.0.0.0
       - PORT=8080
       
@@ -30,81 +30,46 @@ services:
       - ENABLE_VERSIONING=true
       
       # Security Configuration
-      - JWT_SECRET=your-super-secure-jwt-secret-change-in-production
-      
-      # CORS Configuration (for separate console repo)
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+      - JWT_SECRET=dev-jwt-secret-not-for-production
     volumes:
       - objectio_data:/app/data
       - objectio_logs:/app/logs
+      # Mount source code for development
+      - ./crates:/app/crates:ro
     depends_on:
       - surrealdb
       - redis
     networks:
       - objectio-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  #============================================================================
-  # ObjectIO Console - Web Frontend (from separate repository)
-  #============================================================================
-  console:
-    image: ghcr.io/object-io/object-io-console:latest
-    container_name: objectio-console
-    restart: unless-stopped
-    ports:
-      - "3000:80"
-    environment:
-      - API_URL=http://objectio:8080
-      - RUST_LOG=info
-    depends_on:
-      - objectio
-    networks:
-      - objectio-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   #============================================================================
   # SurrealDB - Primary Database
   #============================================================================
   surrealdb:
     image: surrealdb/surrealdb:v2.0.4
-    container_name: objectio-surrealdb
+    container_name: objectio-surrealdb-dev
     restart: unless-stopped
     command: 
       - start
-      - --log=info
+      - --log=debug
       - --user=root
       - --pass=objectio_secure_2025
       - file:///data/objectio.db
     ports:
       - "8000:8000"
     environment:
-      - SURREAL_LOG=info
+      - SURREAL_LOG=debug
     volumes:
       - surrealdb_data:/data
     networks:
       - objectio-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   #============================================================================
   # Redis - Caching Layer
   #============================================================================
   redis:
     image: redis:7.4-alpine
-    container_name: objectio-redis
+    container_name: objectio-redis-dev
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass objectio_redis_2025
     ports:
@@ -115,31 +80,17 @@ services:
       - redis_data:/data
     networks:
       - objectio-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
 networks:
   objectio-network:
     driver: bridge
 
-#==============================================================================
-# Volume Configuration
-#==============================================================================
 volumes:
-  # Application Data
   objectio_data:
     driver: local
-  
   objectio_logs:
     driver: local
-  
-  # Database Data
   surrealdb_data:
     driver: local
-  
   redis_data:
     driver: local
-  

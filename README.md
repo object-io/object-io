@@ -1,29 +1,29 @@
-<div align="left">
-  <img src="https://avatars.githubusercontent.com/u/223274136?s=200&v=4" alt="ObjectIO Logo" width="100" height="100"/>
-</div>
+# ObjectIO - S3-Compatible Object Storage
 
-# ObjectIO
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com)
 
-[![Build Status](https://github.com/object-io/object-io/workflows/CI/badge.svg)](https://github.com/object-io/object-io/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-
-**ObjectIO** is a high-performance, S3-compatible self-hosted object storage system built in Rust. It provides AWS S3 API compatibility while offering the flexibility and control of self-hosted infrastructure.
+ObjectIO is a high-performance, self-hosted S3-compatible object storage system built in Rust. It provides enterprise-grade features with AWS S3 API compatibility, designed for modern cloud-native applications.
 
 ## 🚀 Features
 
-- **S3 Compatible API**: Full compatibility with AWS S3 REST API
-- **High Performance**: Built in Rust for maximum performance and safety
-- **Scalable Architecture**: Modular design supporting horizontal scaling
-- **Multiple Storage Backends**: Filesystem, cloud storage, and more
-- **Web Management Interface**: Modern web UI built with Leptos
-- **Advanced Security**: AWS SigV4 authentication, bucket policies, and ACLs
-- **Monitoring & Observability**: Built-in metrics, tracing, and health checks
-- **Docker Ready**: Containerized deployment with Kubernetes support
+- **S3 API Compatibility**: Full AWS S3 API compatibility for seamless migration
+- **High Performance**: Built with Rust and async/await for maximum throughput
+- **Enterprise Security**: AWS Signature Version 4, RBAC, audit logging
+- **Scalable Architecture**: Modular design with pluggable storage backends
+- **Modern Stack**: Axum web framework, SurrealDB, Redis caching
+- **Cloud Native**: Docker-ready with comprehensive observability
+- **Object Versioning**: Full object versioning support
+- **Multipart Uploads**: Support for large file uploads
+- **Web Console**: Separate web interface for management (see [ObjectIO Console](https://github.com/object-io/object-io-console))
 
 ## 🏗️ Architecture
 
 ObjectIO is designed as a modular system with the following components:
+
+**Backend Repository (this repo)**: Core S3-compatible server  
+**Console Repository**: [ObjectIO Console](https://github.com/object-io/object-io-console) - Web management interface
 
 ```mermaid
 graph TD
@@ -61,7 +61,10 @@ graph TD
 - **`object-io-storage`**: Pluggable storage backend abstraction
 - **`object-io-metadata`**: Metadata management and SurrealDB integration
 - **`object-io-server`**: Main server binary and configuration
-- **`console`**: Unified web-based management interface
+
+### Related Repositories
+
+- **[ObjectIO Console](https://github.com/object-io/object-io-console)**: Web-based management interface built with Leptos WebAssembly
 
 ## 🛠️ Quick Start
 
@@ -86,9 +89,6 @@ graph TD
    ```bash
    # Install Rust dependencies
    cargo build
-
-   # Install console dependencies
-   cd console && npm install && cd ..
    ```
 
 3. **Start SurrealDB**:
@@ -110,18 +110,61 @@ graph TD
    cargo run --bin object-io-server
    ```
 
-6. **Start the console** (in another terminal):
-   ```bash
-   cd console && trunk serve --open
-   ```
-
 ### Docker Deployment
 
-```bash
-# Build the Docker image
-docker build -t object-io:latest .
+#### Option 1: Complete Stack (Backend + Console)
 
-# Run with docker-compose
+```bash
+# Run the complete stack including web console
+docker-compose up -d
+
+# Services will be available at:
+# - ObjectIO API: http://localhost:8080
+# - Web Console: http://localhost:3000
+# - SurrealDB: http://localhost:8000
+# - Redis: localhost:6379
+```
+
+#### Option 2: Backend Only (Development)
+
+```bash
+# Run only backend services for development
+docker-compose -f docker-compose.dev.yml up -d
+
+# Services available at:
+# - ObjectIO API: http://localhost:8080
+# - SurrealDB: http://localhost:8000
+# - Redis: localhost:6379
+```
+
+#### Option 3: Backend Only (Production)
+
+```bash
+# Build and run only the backend services
+docker-compose up -d objectio surrealdb redis
+```
+
+#### Option 3: Backend Only (Production)
+
+```bash
+# Build and run only the backend services
+docker-compose up -d objectio surrealdb redis
+```
+
+#### Option 4: Custom Console Build
+
+If you want to build the console from source instead of using the pre-built image:
+
+```bash
+# Clone the console repository
+git clone https://github.com/object-io/object-io-console.git console
+
+# Update docker-compose.yml to build from source:
+# Replace the console service image with:
+# build:
+#   context: ./console
+#   dockerfile: Dockerfile
+
 docker-compose up -d
 ```
 

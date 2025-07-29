@@ -2,6 +2,9 @@
 target/
 Cargo.lock
 
+# Console directory (separate repo)
+console/
+
 # Logs and temporary files
 *.log
 logs/
@@ -35,6 +38,3 @@ Thumbs.db
 Dockerfile*
 docker-compose*.yml
 .dockerignore
-
-# Node modules (if any)
-node_modules/
